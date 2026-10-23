@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>鍠嘉巡校 CRM 系統</title>
+  
+  <!-- ★ 鍠嘉巡校 App 專屬行動裝置與主畫面 (PWA) 圖示設定 ★ -->
+  <!-- iOS 蘋果手機加入主畫面設定 -->
+  <link rel="apple-touch-icon" sizes="180x180" href="icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="鍠嘉巡校">
+
+  <!-- Android 安卓手機與 Chrome 設定 -->
+  <link rel="icon" type="image/png" sizes="192x192" href="icon.png">
+  <meta name="theme-color" content="#4338CA">
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    /* iOS 觸控優化與滾動平滑 */
+    body {
+      -webkit-tap-highlight-color: transparent;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    .hide-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .hide-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 pb-20 select-none">
+
+  <!-- 頂部導航列 -->
+  <header class="sticky top-0 z-30 bg-indigo-700 text-white shadow-md px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center space-x-2">
+      <!-- 鍠嘉 App 吉祥物小徽章 -->
+      <img src="icon.png" alt="鍠嘉巡校" class="w-8 h-8 rounded-lg shadow border border-yellow-300 onerror-fallback" onerror="this.src='https://cdn-icons-png.flaticon.com/512/3232/3232822.png'">
+      <div>
+        <h1 class="font-bold text-base leading-tight tracking-wide">鍠嘉外勤巡校 CRM</h1>
+        <p class="text-[11px] text-indigo-200">學校資料 ✕ 訂書單 ✕ 教師窗口聯動</p>
+      </div>
+    </div>
+    
+    <!-- 業務切換按鈕 -->
+    <div class="flex items-center space-x-2">
+      <select id="salesmanFilter" onchange="onSalesmanChange()" class="bg-indigo-800 text-white text-xs font-medium py-1.5 px-3 rounded-lg border border-indigo-500 focus:outline-none focus:ring-2 focus:ring-yellow-300">
+        <option value="黃亮智">黃亮智 (145校)</option>
+        <option value="黃依華">黃依華 (168校)</option>
+        <option value="ALL">全部責任校 (313校)</option>
+      </select>
+    </div>
+  </header>
+
+  <!-- 頁面容器 -->
+  <main class="max-w-md mx-auto p-4 space-y-4">
+
+    <!-- 步驟 1: 選擇學校區塊 -->
+    <section class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
+      <div class="flex items-center justify-between mb-3">
+        <label class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+          <i class="fa-solid fa-location-dot text-indigo-600"></i> 1. 選取巡校目標
+        </label>
+        <span id="schoolCountBadge" class="text-[11px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">載入中...</span>
+      </div>
+
+      <!-- 行政區與關鍵字搜尋快篩 -->
+      <div class="grid grid-cols-5 gap-2 mb-2">
+        <select id="districtFilter" onchange="filterSchools()" class="col-span-2 bg-slate-50 border border-slate-300 text-slate-700 text-xs rounded-xl p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+          <option value="ALL">全部區域</option>
+        </select>
+        <div class="col-span-3 relative">
+          <input type="text" id="schoolSearchInput" oninput="filterSchools()" placeholder="搜尋學校名稱..." class="w-full bg-slate-50 border border-slate-300 text-slate-700 text-xs rounded-xl p-2.5 pl-8 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+          <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-3 text-slate-400 text-xs"></i>
+        </div>
+      </div>
+
+      <!-- 學校主選單 -->
+      <select id="schoolSelect" onchange="onSelectSchool()" class="w-full bg-indigo-50/50 border-2 border-indigo-200 text-indigo-950 font-semibold text-sm rounded-xl p-3 focus:ring-2 focus:ring-indigo-600 focus:outline-none">
+        <option value="">-- 請點選要拜訪的學校 --</option>
+      </select>
+    </section>
+
+    <!-- 步驟 2: 學校情報與何嘉仁訂書現況 (選中學校後展開) -->
+    <section id="schoolDetailSection" class="hidden space-y-3">
+      
+      <!-- 學校基本通訊與外勤導航 -->
+      <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
+        <div class="flex justify-between items-start mb-2">
+          <div>
+            <span id="cardCountyDistrict" class="text-[11px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">彰化縣 · 彰化市</span>
+            <h2 id="cardSchoolName" class="text-lg font-bold text-slate-900 mt-1">中山國小</h2>
+          </div>
+          <span id="cardVisitAlert" class="text-xs font-semibold px-2 py-1 rounded-lg bg-green-100 text-green-700">✅ 正常</span>
+        </div>
+
+        <p id="cardAddress" class="text-xs text-slate-500 flex items-center gap-1.5 mt-1">
+          <i class="fa-solid fa-map-pin text-slate-400"></i> 門牌地址載入中...
+        </p>
+
+        <!-- 捷徑功能按鈕：導航、電話、傳真 -->
+        <div class="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-100">
+          <a id="btnCallPhone" href="tel:" class="flex items-center justify-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold py-2 px-3 rounded-xl transition">
+            <i class="fa-solid fa-phone text-emerald-600"></i> 直撥電話
+          </a>
+          <a id="btnGoogleMap" href="#" target="_blank" class="flex items-center justify-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold py-2 px-3 rounded-xl transition">
+            <i class="fa-solid fa-diamond-turn-right text-indigo-600"></i> 地圖導航
+          </a>
+        </div>
+      </div>
+
+      <!-- ★ 核心整合：115-2 何嘉仁訂單與用書情報卡 ★ -->
+      <div class="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 shadow-sm">
+        <div class="flex items-center justify-between mb-2 pb-2 border-b border-amber-200/60">
+          <div class="flex items-center gap-2">
+            <span class="flex h-6 w-6 rounded-lg bg-amber-500 text-white items-center justify-center text-xs">
+              <i class="fa-solid fa-book-bookmark"></i>
+            </span>
+            <h3 class="font-bold text-sm text-amber-950">115-2 何嘉仁訂單現況</h3>
+          </div>
+          <span id="orderStatusBadge" class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-200/70 text-amber-900">查詢中...</span>
+        </div>
+
+        <div id="orderInfoContent" class="text-xs space-y-2">
+          <!-- 承辦與電話 -->
+          <div class="grid grid-cols-2 gap-2 text-amber-900/80">
+            <div><span class="font-semibold text-amber-950">校內承辦：</span><span id="orderContact">--</span></div>
+            <div><span class="font-semibold text-amber-950">送書週次：</span><span id="orderDeliveryDates">--</span></div>
+          </div>
+          <!-- 校內指送地點備忘 -->
+          <div class="bg-white/80 p-2 rounded-xl border border-amber-200/50">
+            <span class="font-bold text-amber-900 block text-[11px]">📍 校內指送地點：</span>
+            <p id="orderDeliveryLoc" class="text-slate-700 text-xs mt-0.5 leading-relaxed font-medium">--</p>
+          </div>
+          <!-- 各年級用書明細 -->
+          <div class="mt-2">
+            <span class="font-bold text-amber-950 block text-[11px] mb-1">📦 採用教材品項與數量：</span>
+            <div id="orderItemsContainer" class="flex flex-wrap gap-1.5">
+              <span class="text-slate-400 text-xs">無用書資料</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 處室窗口快選卡 -->
+      <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
+        <label class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between mb-2">
+          <span class="flex items-center gap-1.5"><i class="fa-solid fa-users text-indigo-600"></i> 校內教師與處室窗口</span>
+          <span class="text-[10px] text-slate-400 font-normal">點擊自動帶入拜訪名單</span>
+        </label>
+        <div id="teachersChipsContainer" class="flex flex-wrap gap-2">
+          <!-- 動態置入窗口標籤 -->
+        </div>
+      </div>
+
+      <!-- 最近返校歷史 -->
+      <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
+        <div class="flex items-center justify-between mb-2">
+          <label class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+            <i class="fa-solid fa-clock-rotate-left text-indigo-600"></i> 前次拜訪備忘
+          </label>
+          <span id="lastVisitDateBadge" class="text-[11px] text-slate-400">尚無紀錄</span>
+        </div>
+        <p id="lastVisitNote" class="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 leading-relaxed italic">
+          點選學校後將自動帶出上次交談筆記...
+        </p>
+      </div>
+
+      <!-- 步驟 3: 填寫本次返校紀錄表單 -->
+      <form id="visitLogForm" onsubmit="submitVisitLog(event)" class="bg-white rounded-2xl p-4 shadow-sm border-2 border-indigo-600 space-y-3">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+          <h3 class="font-bold text-sm text-indigo-900 flex items-center gap-1.5">
+            <i class="fa-solid fa-pen-to-square text-indigo-600"></i> 填寫本次返校紀錄
+          </h3>
+          <span class="text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded" id="formCurrentDate">2026-10-23</span>
+        </div>
+
+        <!-- 洽談窗口 (可多選或自填) -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">洽談教師 / 窗口</label>
+          <input type="text" id="targetTeachersInput" required placeholder="如：教務主任、英語召集人 張老師" class="w-full bg-slate-50 border border-slate-300 text-xs rounded-xl p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+        </div>
+
+        <!-- 拜訪目的 (按鈕式 Tag 多選) -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">拜訪目的 (可複選)</label>
+          <div class="grid grid-cols-3 gap-1.5" id="purposeTagsGroup">
+            <button type="button" onclick="togglePurposeTag(this, '例行巡校')" class="purpose-tag py-1.5 px-2 text-[11px] rounded-lg border border-slate-200 text-slate-600 font-medium">例行巡校</button>
+            <button type="button" onclick="togglePurposeTag(this, '樣書推廣')" class="purpose-tag py-1.5 px-2 text-[11px] rounded-lg border border-slate-200 text-slate-600 font-medium">樣書推廣</button>
+            <button type="button" onclick="togglePurposeTag(this, '補退書處理')" class="purpose-tag py-1.5 px-2 text-[11px] rounded-lg border border-slate-200 text-slate-600 font-medium">補退書處理</button>
+            <button type="button" onclick="togglePurposeTag(this, '用書售後追蹤')" class="purpose-tag py-1.5 px-2 text-[11px] rounded-lg border border-slate-200 text-slate-600 font-medium">售後追蹤</button>
+            <button type="button" onclick="togglePurposeTag(this, '對帳請款')" class="purpose-tag py-1.5 px-2 text-[11px] rounded-lg border border-slate-200 text-slate-600 font-medium">對帳請款</button>
+            <button type="button" onclick="togglePurposeTag(this, '選書意向評估')" class="purpose-tag py-1.5 px-2 text-[11px] rounded-lg border border-slate-200 text-slate-600 font-medium">選書戰情</button>
+          </div>
+        </div>
+
+        <!-- 談話重點與教材回饋 (支援 Web Speech API 語音輸入) -->
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="text-xs font-semibold text-slate-700">談話重點 / 教材反饋</label>
+            <button type="button" id="btnVoiceInput" onclick="toggleSpeechRecognition()" class="text-[11px] text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded-full flex items-center gap-1 font-semibold transition">
+              <i class="fa-solid fa-microphone"></i> 語音輸入
+            </button>
+          </div>
+          <textarea id="feedbackTextarea" rows="3" required placeholder="點擊右上方語音按鈕，或輸入與老師討論的重點、教材缺書狀況..." class="w-full bg-slate-50 border border-slate-300 text-xs rounded-xl p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
+        </div>
+
+        <!-- 待辦事項跟進 (Checkbox) -->
+        <div class="bg-indigo-50/60 p-3 rounded-xl border border-indigo-100 space-y-2">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="hasTodoCheckbox" onchange="toggleTodoFields()" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4">
+            <span class="text-xs font-bold text-indigo-950">需要後續跟進事項 (Action Item)</span>
+          </label>
+          <div id="todoFieldsContainer" class="hidden space-y-2 pt-1">
+            <input type="text" id="todoItemInput" placeholder="待辦內容（例：下週二前補送五年級習作 2 本）" class="w-full bg-white border border-slate-300 text-xs rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            <div class="flex items-center gap-2">
+              <span class="text-[11px] text-slate-500 shrink-0">截止日期：</span>
+              <input type="date" id="todoDueDateInput" class="w-full bg-white border border-slate-300 text-xs rounded-lg p-1.5 focus:outline-none">
+            </div>
+          </div>
+        </div>
+
+        <!-- 送出按鈕 -->
+        <button type="submit" id="btnSubmitForm" class="w-full bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold text-sm py-3 rounded-xl shadow-md transition flex items-center justify-center gap-2">
+          <i class="fa-solid fa-cloud-arrow-up"></i> 送出返校紀錄
+        </button>
+      </form>
+    </section>
+
+  </main>
+
+  <!-- 全域狀態與業務腳本 -->
+  <script>
+    // 預設後端 API Web App 網址
+    const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbyC6ibSq2874CKZIJVgqrJRYMB9UKOD2pXI_-iRceYdmn67BwiYo6sa_4y4_UwUyWKt/exec';
+
+    // 全域記憶體資料
+    let rawSchoolsData = [];
+    let currentSelectedSchool = null;
+    let selectedPurposes = [];
+    let isSpeechRecording = false;
+    let recognitionInstance = null;
+
+    // 頁面初始化
+    document.addEventListener('DOMContentLoaded', () => {
+      // 設定今日日期
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('formCurrentDate').textContent = today;
+      
+      // 設定預設待辦截止日為 3 天後
+      const defaultDue = new Date();
+      defaultDue.setDate(defaultDue.getDate() + 3);
+      document.getElementById('todoDueDateInput').value = defaultDue.toISOString().split('T')[0];
+
+      // 開始向後端抓取 313 所學校名單
+      fetchInitialSchools();
+    });
+
+    /**
+     * 免 CORS 的 JSONP 呼叫函式
+     */
+    function jsonpFetch(url, params = {}) {
+      return new Promise((resolve, reject) => {
+        const callbackName = 'jsonp_crm_' + Math.round(1000000 * Math.random());
+        params.callback = callbackName;
+        
+        const queryString = new URLSearchParams(params).toString();
+        const script = document.createElement('script');
+        script.src = `${url}?${queryString}`;
+
+        // 逾時防護 (10 秒)
+        const timeout = setTimeout(() => {
+          cleanup();
+          reject(new Error('連線逾時，請確認網路或 API 部署設定'));
+        }, 10000);
+
+        function cleanup() {
+          clearTimeout(timeout);
+          if (window[callbackName]) delete window[callbackName];
+          if (script.parentNode) script.parentNode.removeChild(script);
+        }
+
+        window[callbackName] = function(data) {
+          cleanup();
+          resolve(data);
+        };
+
+        script.onerror = function() {
+          cleanup();
+          reject(new Error('網路連線失敗，無法取得試算表資料'));
+        };
+
+        document.body.appendChild(script);
+      });
+    }
+
+    /**
+     * 讀取學校基底名單
+     */
+    async function fetchInitialSchools() {
+      const badge = document.getElementById('schoolCountBadge');
+      badge.textContent = '連線中...';
+
+      try {
+        const res = await jsonpFetch(GAS_API_URL, { action: 'getInitialData' });
+        if (res.success && res.schools) {
+          rawSchoolsData = res.schools;
+          buildDistrictOptions();
+          filterSchools();
+        } else {
+          throw new Error(res.error || '無法取得名單');
+        }
+      } catch (err) {
+        console.warn('GAS 連線警示，啟用離線基礎名單：', err);
+        badge.textContent = '離線快取模式';
+        // 若完全斷網，載入預備核心示範名單
+        rawSchoolsData = getFallbackSchools();
+        buildDistrictOptions();
+        filterSchools();
+      }
+    }
+
+    /**
+     * 建立行政區下拉選單
+     */
+    function buildDistrictOptions() {
+      const select = document.getElementById('districtFilter');
+      const districts = [...new Set(rawSchoolsData.map(s => s.district))].filter(Boolean);
+      select.innerHTML = '<option value="ALL">全部區域 (' + districts.length + '區)</option>' +
+        districts.map(d => `<option value="${d}">${d}</option>`).join('');
+    }
+
+    /**
+     * 業務人員切換
+     */
+    function onSalesmanChange() {
+      buildDistrictOptions();
+      filterSchools();
+    }
+
+    /**
+     * 依據業務、區域、搜尋關鍵字過濾學校清單
+     */
+    function filterSchools() {
+      const currentSalesman = document.getElementById('salesmanFilter').value;
+      const currentDistrict = document.getElementById('districtFilter').value;
+      const searchKeyword = document.getElementById('schoolSearchInput').value.trim().toLowerCase();
+      const schoolSelect = document.getElementById('schoolSelect');
+      const badge = document.getElementById('schoolCountBadge');
+
+      const filtered = rawSchoolsData.filter(s => {
+        const matchSalesman = (currentSalesman === 'ALL') || (s.salesman === currentSalesman);
+        const matchDistrict = (currentDistrict === 'ALL') || (s.district === currentDistrict);
+        const matchSearch = !searchKeyword || 
+          (s.short_name && s.short_name.toLowerCase().includes(searchKeyword)) ||
+          (s.school_id && s.school_id.toLowerCase().includes(searchKeyword));
+        return matchSalesman && matchDistrict && matchSearch;
+      });
+
+      badge.textContent = `共 ${filtered.length} 所`;
+
+      schoolSelect.innerHTML = '<option value="">-- 請點選要拜訪的學校 (' + filtered.length + ') --</option>' +
+        filtered.map(s => {
+          const alertEmoji = (s.visit_alert && s.visit_alert.includes('需返校')) ? '🚨' : '🏫';
+          return `<option value="${s.school_id}">${alertEmoji} [${s.district}] ${s.short_name}</option>`;
+        }).join('');
+    }
+
+    /**
+     * 選定單一學校，調閱詳情 (聯動 Teachers_DB 與 何嘉仁訂書單)
+     */
+    async function onSelectSchool() {
+      const schoolId = document.getElementById('schoolSelect').value;
+      const detailSec = document.getElementById('schoolDetailSection');
+
+      if (!schoolId) {
+        detailSec.classList.add('hidden');
+        return;
+      }
+
+      detailSec.classList.remove('hidden');
+      resetFormInputs();
+
+      // 先從快取帶出基本校名地址
+      const basic = rawSchoolsData.find(s => s.school_id === schoolId);
+      if (basic) {
+        document.getElementById('cardSchoolName').textContent = basic.short_name;
+        document.getElementById('cardCountyDistrict').textContent = `${basic.county} · ${basic.district}`;
+        document.getElementById('cardVisitAlert').textContent = basic.visit_alert || '✅ 正常';
+      }
+
+      // 遠端拉取完整資料 (含教師名單、前次拜訪筆記、何嘉仁 115-2 訂書單)
+      try {
+        const res = await jsonpFetch(GAS_API_URL, { action: 'getSchoolDetails', school_id: schoolId });
+        if (res.success) {
+          renderSchoolDetails(res);
+        }
+      } catch (e) {
+        console.error('取得學校詳情失敗', e);
+      }
+    }
+
+    /**
+     * 渲染學校完整詳情與何嘉仁訂書現況
+     */
+    function renderSchoolDetails(data) {
+      const sch = data.school || {};
+      const teachers = data.teachers || [];
+      const recentLogs = data.recent_logs || [];
+      const order = data.order_summary;
+
+      // 1. 基本資訊卡
+      document.getElementById('cardSchoolName').textContent = sch.short_name || sch.school_name;
+      document.getElementById('cardCountyDistrict').textContent = `${sch.county} · ${sch.district}`;
+      document.getElementById('cardAddress').innerHTML = `<i class="fa-solid fa-map-pin text-slate-400"></i> ${sch.address || '無門牌資料'}`;
+      
+      // 撥號與導航捷徑
+      document.getElementById('btnCallPhone').href = sch.phone ? `tel:${sch.phone}` : '#';
+      document.getElementById('btnGoogleMap').href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(sch.school_name || sch.short_name)}`;
+
+      // 2. ★ 渲染何嘉仁訂單與用書情報 ★
+      const orderBadge = document.getElementById('orderStatusBadge');
+      const orderContact = document.getElementById('orderContact');
+      const orderDates = document.getElementById('orderDeliveryDates');
+      const orderLoc = document.getElementById('orderDeliveryLoc');
+      const itemsContainer = document.getElementById('orderItemsContainer');
+
+      if (order && order.has_order) {
+        orderBadge.textContent = order.status || '已傳真何嘉仁';
+        orderBadge.className = 'text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800';
+        orderContact.textContent = `${order.contact_person} (${order.contact_phone || '無電話'})`;
+        orderDates.textContent = order.delivery_dates || '常規送書期';
+        orderLoc.textContent = order.delivery_location || '教務處';
+
+        // 渲染品項與數量標籤
+        if (order.items && order.items.length > 0) {
+          itemsContainer.innerHTML = order.items.map(it => `
+            <span class="inline-flex items-center gap-1 bg-white border border-amber-300/80 px-2 py-1 rounded-lg text-[11px] font-semibold text-amber-950 shadow-2xs">
+              <span class="text-amber-700">${it.item}</span>
+              <span class="bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded text-[10px] font-bold">${it.qty} 冊</span>
+            </span>
+          `).join('');
+        } else {
+          itemsContainer.innerHTML = `<span class="text-xs text-slate-500">總計：課本 ${order.total_textbook || 0} / 習作 ${order.total_workbook || 0}</span>`;
+        }
+      } else {
+        orderBadge.textContent = '115-2 尚無訂購單據';
+        orderBadge.className = 'text-[11px] font-medium px-2 py-0.5 rounded-full bg-slate-200 text-slate-600';
+        orderContact.textContent = '暫無';
+        orderDates.textContent = '無';
+        orderLoc.textContent = '預設送教務處';
+        itemsContainer.innerHTML = '<span class="text-xs text-slate-400">目前本學期尚未有本校的填報紀錄</span>';
+      }
+
+      // 3. 渲染教師窗口標籤
+      const chipsContainer = document.getElementById('teachersChipsContainer');
+      if (teachers.length > 0) {
+        chipsContainer.innerHTML = teachers.map(t => `
+          <button type="button" onclick="selectTeacherChip('${t.name} (${t.title || ''})')" class="text-xs bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 border border-slate-200 px-2.5 py-1.5 rounded-xl font-medium flex items-center gap-1.5 transition">
+            <i class="fa-solid fa-user-tag text-[10px] text-slate-400"></i>
+            <span>${t.name}</span>
+            <span class="text-[10px] text-slate-400">· ${t.title || '老師'}</span>
+          </button>
+        `).join('');
+      } else {
+        chipsContainer.innerHTML = '<span class="text-xs text-slate-400 italic">尚未建置窗口，可直接在下方手動輸入</span>';
+      }
+
+      // 4. 渲染最近返校筆記
+      const lastNote = document.getElementById('lastVisitNote');
+      const lastDateBadge = document.getElementById('lastVisitDateBadge');
+      if (recentLogs.length > 0) {
+        const last = recentLogs[0];
+        lastDateBadge.textContent = last.visit_date;
+        lastNote.textContent = `【${last.teacher_names || '窗口'}】${last.feedback || '例行拜訪完成'}`;
+      } else {
+        lastDateBadge.textContent = '本學期首次返校';
+        lastNote.textContent = '本學期尚未有歷史紀錄，請於下方完成首次巡校打卡。';
+      }
+    }
+
+    /**
+     * 點擊教師窗口晶片標籤，填入輸入框
+     */
+    function selectTeacherChip(teacherDesc) {
+      const input = document.getElementById('targetTeachersInput');
+      if (!input.value) {
+        input.value = teacherDesc;
+      } else if (!input.value.includes(teacherDesc)) {
+        input.value += `, ${teacherDesc}`;
+      }
+    }
+
+    /**
+     * 拜訪目的按鈕切換
+     */
+    function togglePurposeTag(btn, tagName) {
+      if (selectedPurposes.includes(tagName)) {
+        selectedPurposes = selectedPurposes.filter(t => t !== tagName);
+        btn.classList.remove('bg-indigo-600', 'text-white', 'border-indigo-600');
+        btn.classList.add('border-slate-200', 'text-slate-600');
+      } else {
+        selectedPurposes.push(tagName);
+        btn.classList.add('bg-indigo-600', 'text-white', 'border-indigo-600');
+        btn.classList.remove('border-slate-200', 'text-slate-600');
+      }
+    }
+
+    /**
+     * 待辦事項欄位切換
+     */
+    function toggleTodoFields() {
+      const checked = document.getElementById('hasTodoCheckbox').checked;
+      const container = document.getElementById('todoFieldsContainer');
+      const input = document.getElementById('todoItemInput');
+      if (checked) {
+        container.classList.remove('hidden');
+        input.focus();
+      } else {
+        container.classList.add('hidden');
+        input.value = '';
+      }
+    }
+
+    /**
+     * Web Speech API 語音輸入
+     */
+    function toggleSpeechRecognition() {
+      const btn = document.getElementById('btnVoiceInput');
+      const textarea = document.getElementById('feedbackTextarea');
+
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        alert('您的手機瀏覽器不支援語音辨識，請使用鍵盤或微軟輸入法內建語音功能');
+        return;
+      }
+
+      if (isSpeechRecording) {
+        if (recognitionInstance) recognitionInstance.stop();
+        isSpeechRecording = false;
+        btn.innerHTML = '<i class="fa-solid fa-microphone"></i> 語音輸入';
+        btn.classList.remove('bg-red-500', 'text-white');
+        btn.classList.add('bg-indigo-50', 'text-indigo-600');
+      } else {
+        recognitionInstance = new SpeechRecognition();
+        recognitionInstance.lang = 'zh-TW';
+        recognitionInstance.continuous = false;
+        recognitionInstance.interimResults = false;
+
+        recognitionInstance.onstart = function() {
+          isSpeechRecording = true;
+          btn.innerHTML = '<i class="fa-solid fa-circle-dot animate-pulse"></i> 聆聽中...';
+          btn.classList.add('bg-red-500', 'text-white');
+          btn.classList.remove('bg-indigo-50', 'text-indigo-600');
+        };
+
+        recognitionInstance.onresult = function(event) {
+          const transcript = event.results[0][0].transcript;
+          textarea.value = textarea.value ? `${textarea.value}，${transcript}` : transcript;
+        };
+
+        recognitionInstance.onerror = function() {
+          isSpeechRecording = false;
+          btn.innerHTML = '<i class="fa-solid fa-microphone"></i> 語音輸入';
+          btn.classList.remove('bg-red-500', 'text-white');
+        };
+
+        recognitionInstance.onend = function() {
+          isSpeechRecording = false;
+          btn.innerHTML = '<i class="fa-solid fa-microphone"></i> 語音輸入';
+          btn.classList.remove('bg-red-500', 'text-white');
+          btn.classList.add('bg-indigo-50', 'text-indigo-600');
+        };
+
+        recognitionInstance.start();
+      }
+    }
+
+    /**
+     * 送出返校打卡紀錄表單
+     */
+    async function submitVisitLog(e) {
+      e.preventDefault();
+
+      const schoolId = document.getElementById('schoolSelect').value;
+      const currentSalesman = document.getElementById('salesmanFilter').value;
+      const teachers = document.getElementById('targetTeachersInput').value.trim();
+      const feedback = document.getElementById('feedbackTextarea').value.trim();
+      const hasTodo = document.getElementById('hasTodoCheckbox').checked;
+      const todoItem = document.getElementById('todoItemInput').value.trim();
+      const todoDueDate = document.getElementById('todoDueDateInput').value;
+      const submitBtn = document.getElementById('btnSubmitForm');
+
+      if (!schoolId) {
+        alert('請先選取學校');
+        return;
+      }
+
+      if (hasTodo && !todoItem) {
+        alert('您勾選了後續跟進，請填寫待辦內容');
+        return;
+      }
+
+      const logPayload = {
+        school_id: schoolId,
+        salesman: currentSalesman === 'ALL' ? '黃亮智' : currentSalesman,
+        teacher_names: teachers,
+        purposes: selectedPurposes.length > 0 ? selectedPurposes : ['例行巡校'],
+        feedback: feedback,
+        todo_item: hasTodo ? todoItem : '',
+        todo_due_date: hasTodo ? todoDueDate : '',
+        todo_status: hasTodo ? '待處理' : '',
+        sync_status: 'ONLINE'
+      };
+
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 打卡寫入試算表中...';
+
+      try {
+        // 使用 POST 送出寫入
+        const response = await fetch(GAS_API_URL, {
+          method: 'POST',
+          mode: 'no-cors', // 避免跨域阻擋
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'saveVisitLog',
+            data: logPayload
+          })
+        });
+
+        alert('✅ 打卡成功！返校紀錄已同步寫入 Visit_Logs，並更新最後拜訪日期。');
+        
+        // 更新本地快取警示燈
+        const sch = rawSchoolsData.find(s => s.school_id === schoolId);
+        if (sch) sch.visit_alert = '✅ 正常';
+        document.getElementById('cardVisitAlert').textContent = '✅ 正常';
+
+        resetFormInputs();
+      } catch (err) {
+        alert('寫入過程發生異常，請確認網路連線');
+        console.error(err);
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> 送出返校紀錄';
+      }
+    }
+
+    /**
+     * 重置表單狀態
+     */
+    function resetFormInputs() {
+      document.getElementById('targetTeachersInput').value = '';
+      document.getElementById('feedbackTextarea').value = '';
+      document.getElementById('hasTodoCheckbox').checked = false;
+      document.getElementById('todoItemInput').value = '';
+      document.getElementById('todoFieldsContainer').classList.add('hidden');
+      selectedPurposes = [];
+      document.querySelectorAll('.purpose-tag').forEach(b => {
+        b.classList.remove('bg-indigo-600', 'text-white', 'border-indigo-600');
+        b.classList.add('border-slate-200', 'text-slate-600');
+      });
+    }
+
+    /**
+     * 備用離線核心名單（當無法連上網路時使用）
+     */
+    function getFallbackSchools() {
+      return [
+        { school_id: 'SCH-CH-001', short_name: '中山國小', county: '彰化縣', district: '彰化市', salesman: '黃亮智', visit_alert: '✅ 正常' },
+        { school_id: 'SCH-CH-002', short_name: '民生國小', county: '彰化縣', district: '彰化市', salesman: '黃亮智', visit_alert: '🚨 需返校' },
+        { school_id: 'SCH-CH-078', short_name: '員林國小', county: '彰化縣', district: '員林市', salesman: '黃依華', visit_alert: '✅ 正常' },
+        { school_id: 'SCH-NT-187', short_name: '南光國小', county: '南投縣', district: '埔里鎮', salesman: '黃亮智', visit_alert: '✅ 正常' },
+        { school_id: 'SCH-NT-199', short_name: '僑光國小', county: '南投縣', district: '草屯鎮', salesman: '黃亮智', visit_alert: '✅ 正常' }
+      ];
+    }
+  </script>
+</body>
+</html>
